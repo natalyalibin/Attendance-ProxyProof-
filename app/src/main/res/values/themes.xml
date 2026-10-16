@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.Attendence" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">#13705A</item>
+        <item name="colorPrimaryVariant">#13705A</item>
+        <item name="colorSecondary">#13705A</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#F5F7F2</item>
+        <item name="android:navigationBarColor">#162B2B</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>
