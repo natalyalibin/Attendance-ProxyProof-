@@ -65,3 +65,4 @@ Tested the installed app on a Pixel 9 (admin) and Motorola edge 2024 (employee),
 - Added BLE stage/error diagnostics under `AttendanceBLE`; diagnostic statements do not include employee names, PINs, or event payloads. Unit tests and lint passed.
 
 If the same connection-with-no-receipt failure recurs, stop the station, toggle Bluetooth off/on on the admin phone, start the station, and retry the employee's **pending** record. This is a recovery for the observed Bluetooth stack state, not proof that every Android/vendor stack issue is permanently eliminated. No app data reset is needed. Do not uninstall or clear data to recover a pending event.
+# Attendance-ProxyProof-
