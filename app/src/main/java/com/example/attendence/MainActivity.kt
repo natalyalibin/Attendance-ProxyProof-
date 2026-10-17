@@ -43,7 +43,7 @@ class MainActivity : AppCompatActivity() {
     private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         val action = pending; pending = null
         if (result.values.all { it }) action?.invoke()
-        else { notice = "Permission is needed to use the office signal. Allow Nearby devices and Location in app settings, then retry."; dashboard() }
+        else { notice = "Permission is needed to use the campus signal. Allow Nearby devices and Location in app settings, then retry."; dashboard() }
     }
     private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         // Notification permission is optional for a foreground service, not a BLE permission.
@@ -83,8 +83,8 @@ class MainActivity : AppCompatActivity() {
         if (uri != null) {
             try {
                 val rows = if (store.profile()?.admin == true) store.teamRecords() else store.records()
-                val csv = "Employee ID,Name,Action,Employee time,Office,Signal dBm,Delivery,Admin received time,Record ID\n" + rows.joinToString("\n") { r ->
-                    listOf(r.employeeId, r.employeeName, if (r.checkIn) "Check in" else "Check out", format(r.timestamp, "yyyy-MM-dd'T'HH:mm:ssXXX"), r.office, r.rssi.toString(), if (r.delivered) "Received by admin" else "Local only", if (r.receivedAt > 0) format(r.receivedAt, "yyyy-MM-dd'T'HH:mm:ssXXX") else "", r.id).joinToString(",") { value ->
+                val csv = "Student ID,Name,Action,Student time,Campus,Signal dBm,Delivery,Professor received time,Record ID\n" + rows.joinToString("\n") { r ->
+                    listOf(r.employeeId, r.employeeName, if (r.checkIn) "Check in" else "Check out", format(r.timestamp, "yyyy-MM-dd'T'HH:mm:ssXXX"), r.office, r.rssi.toString(), if (r.delivered) "Received by professor" else "Local only", if (r.receivedAt > 0) format(r.receivedAt, "yyyy-MM-dd'T'HH:mm:ssXXX") else "", r.id).joinToString(",") { value ->
                         val safe = if (value.firstOrNull() in listOf('=', '+', '-', '@', '\t', '\r')) "'$value" else value
                         "\"${safe.replace("\"", "\"\"")}\""
                     }
@@ -132,11 +132,13 @@ class MainActivity : AppCompatActivity() {
         val scroll = ScrollView(this).apply { setBackgroundColor(bg); isFillViewport = true }
         body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(24), dp(24), dp(28)) }
         scroll.addView(body)
-        setContentView(scroll)
-        ViewCompat.setOnApplyWindowInsetsListener(scroll) { view, insets ->
+        val frame = FrameLayout(this).apply { setBackgroundColor(bg); addView(scroll) }
+        ViewCompat.setOnApplyWindowInsetsListener(frame) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom); insets
         }
+        setContentView(frame)
+        ViewCompat.requestApplyInsets(frame)
         label(body, "◉  P R E S E N T", 18, green, true)
         space(body, 30)
         label(body, eyebrow.uppercase(Locale.ROOT), 11, muted, true)
@@ -179,14 +181,14 @@ class MainActivity : AppCompatActivity() {
         val panel = card()
         label(panel, "Use this phone as", 16, ink, true)
         val roles = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
-        val employee = RadioButton(this).apply { id = View.generateViewId(); text = "Employee · check in and out"; setTextColor(ink); minHeight = dp(48) }
-        val admin = RadioButton(this).apply { id = View.generateViewId(); text = "Office station · collect attendance"; setTextColor(ink); minHeight = dp(48) }
+        val employee = RadioButton(this).apply { id = View.generateViewId(); text = "Student · check in and out"; setTextColor(ink); minHeight = dp(48) }
+        val admin = RadioButton(this).apply { id = View.generateViewId(); text = "Professor · collect attendance"; setTextColor(ink); minHeight = dp(48) }
         roles.addView(employee); roles.addView(admin); roles.check(employee.id); panel.addView(roles)
         space(panel, 16)
         val name = field(panel, "Your name", "e.g. Alex Morgan")
-        val employeeId = field(panel, "Employee / admin ID", "e.g. EMP-001")
-        val office = field(panel, "Shared office code", "e.g. KOCHI-HQ")
-        label(panel, "Enter the same office code on the admin and employee phones.", 12, muted)
+        val employeeId = field(panel, "Student / professor ID", "e.g. STU-001")
+        val office = field(panel, "Shared campus code", "e.g. CAMPUS-01")
+        label(panel, "Enter the same campus code on the professor and student phones.", 12, muted)
         val pin = field(panel, "Create a 6-digit PIN", "6 digits", true)
         val confirm = field(panel, "Confirm PIN", "Re-enter PIN", true)
         val error = label(panel, "", 13, Color.rgb(170, 57, 49))
@@ -194,7 +196,7 @@ class MainActivity : AppCompatActivity() {
             val officeCode = office.text.toString().trim().uppercase(Locale.ROOT)
             when {
                 name.text.isBlank() || employeeId.text.isBlank() -> error.text = "Enter your name and ID."
-                !officeCode.matches(Regex("[A-Z0-9-]{4,24}")) -> error.text = "Office code: use 4–24 letters, numbers or hyphens."
+                !officeCode.matches(Regex("[A-Z0-9-]{4,24}")) -> error.text = "Campus code: use 4–24 letters, numbers or hyphens."
                 !pin.text.toString().matches(Regex("[0-9]{6}")) -> error.text = "Choose a 6-digit PIN."
                 pin.text.toString() != confirm.text.toString() -> error.text = "The PINs don’t match."
                 else -> {
@@ -203,11 +205,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        label(body, "Prototype access is self-configured on each phone. The office code identifies a signal; it is not a secure credential.", 12, muted)
+        label(body, "Prototype access is self-configured on each phone. The campus code identifies a signal; it is not a secure credential.", 12, muted)
     }
     private fun login() {
         val profile = store.profile() ?: return setup()
-        page("Welcome back", "Hello, ${profile.name.substringBefore(' ')}.", "Unlock your ${if (profile.admin) "office station" else "attendance"} with your local PIN.")
+        page("Welcome back", "Hello, ${profile.name.substringBefore(' ')}.", "Unlock your ${if (profile.admin) "campus station" else "attendance"} with your local PIN.")
         val panel = card()
         val pin = field(panel, "Your PIN", "6 digits", true)
         val error = label(panel, "", 13, Color.rgb(170, 57, 49))
@@ -216,7 +218,7 @@ class MainActivity : AppCompatActivity() {
             else if (store.verify(pin.text.toString())) { unlocked = true; loginAttempts = 0; dashboard() }
             else { loginAttempts++; if (loginAttempts >= 5) { retryAfter = android.os.SystemClock.elapsedRealtime() + 30_000; loginAttempts = 0 }; error.text = "Incorrect PIN. Please try again."; pin.text.clear() }
         }
-        label(body, "${profile.employeeId}  •  ${profile.office}\nAttendance stays on the employee and admin phones. Keep your PIN safe; recovery is not available in this prototype.", 13, muted)
+        label(body, "${profile.employeeId}  •  ${profile.office}\nAttendance stays on the student and professor phones. Keep your PIN safe; recovery is not available in this prototype.", 13, muted)
     }
     private fun dashboard() {
         if (!unlocked) return
@@ -225,7 +227,7 @@ class MainActivity : AppCompatActivity() {
             busy = AttendanceStationService.state.starting
             broadcasting = AttendanceStationService.state.running
         }
-        page(if (profile.admin) "Office station" else format(System.currentTimeMillis(), "EEEE, d MMMM"), if (profile.admin) "Bring your team\nwithin reach." else if (history) "Your attendance." else "Hello, ${profile.name.substringBefore(' ')}.", "${profile.employeeId}  /  ${profile.office}")
+        page(if (profile.admin) "Campus station" else format(System.currentTimeMillis(), "EEEE, d MMMM"), if (profile.admin) "Bring your class\nwithin reach." else if (history) "Your attendance." else "Hello, ${profile.name.substringBefore(' ')}.", "${profile.employeeId}  /  ${profile.office}")
         if (notice.isNotEmpty()) label(card(color = Color.rgb(235, 240, 221)), notice, 14)
         if (profile.admin) adminPanel(profile) else employeePanel()
         space(body, 8)
@@ -252,14 +254,14 @@ class MainActivity : AppCompatActivity() {
         val latest = records.groupBy { it.employeeId }.values.map { it.last() }
         val today = format(System.currentTimeMillis(), "yyyy-MM-dd")
         val summary = card()
-        label(summary, "TEAM ATTENDANCE", 11, muted, true)
+        label(summary, "CLASS ATTENDANCE", 11, muted, true)
         label(summary, "${latest.count { it.checkIn }} checked in", 28, ink, true)
-        label(summary, "${latest.size} employees recorded · ${records.count { format(it.receivedAt, "yyyy-MM-dd") == today }} events received today", 13, muted)
-        if (records.isEmpty()) label(summary, "No attendance received yet. Share office code ${profile.office} and ask an employee to scan using the updated app.", 15, muted)
+        label(summary, "${latest.size} students recorded · ${records.count { format(it.receivedAt, "yyyy-MM-dd") == today }} events received today", 13, muted)
+        if (records.isEmpty()) label(summary, "No attendance received yet. Share campus code ${profile.office} and ask a student to scan using the updated app.", 15, muted)
         latest.sortedBy { it.employeeName.lowercase(Locale.ROOT) }.forEach { entry ->
             space(summary, 8)
             label(summary, "${if (entry.checkIn) "●" else "○"}  ${entry.employeeName}", 16, ink, true)
-            label(summary, "${entry.employeeId} · ${if (entry.checkIn) "Checked in" else "Checked out"}\n${format(entry.timestamp, "dd MMM, h:mm a")} (employee time)", 12, muted)
+            label(summary, "${entry.employeeId} · ${if (entry.checkIn) "Checked in" else "Checked out"}\n${format(entry.timestamp, "dd MMM, h:mm a")} (student time)", 12, muted)
         }
         if (records.isNotEmpty()) {
             val list = card()
@@ -270,9 +272,9 @@ class MainActivity : AppCompatActivity() {
                 space(list, 8)
             }
             button(body, if (history) "Show recent records" else "View all received records", true, !busy) { history = !history; dashboard() }
-            button(body, "Export team attendance as CSV", true, !busy) { export.launch("team-attendance-${format(System.currentTimeMillis(), "yyyy-MM-dd")}.csv") }
+            button(body, "Export class attendance as CSV", true, !busy) { export.launch("class-attendance-${format(System.currentTimeMillis(), "yyyy-MM-dd")}.csv") }
         }
-        label(body, "Records are stored on this admin phone, even after the station stops. Keep Bluetooth on. Collection continues while exporting or with the screen locked. After a phone restart or force-stop, open the app and start the station again. Use one station per office code.", 12, muted)
+        label(body, "Records are stored on this professor phone, even after the station stops. Keep Bluetooth on. Collection continues while exporting or with the screen locked. After a phone restart or force-stop, open the app and start the station again. Use one station per campus code.", 12, muted)
     }
     private fun employeePanel() {
         val records = store.records()
@@ -280,14 +282,14 @@ class MainActivity : AppCompatActivity() {
         val nextIn = AttendanceRules.nextIsCheckIn(records)
         if (pendingEntry != null) {
             val pendingCard = card(color = Color.rgb(255, 240, 208))
-            label(pendingCard, "Awaiting admin receipt", 17, ink, true)
-            label(pendingCard, "${if (pendingEntry.checkIn) "Check-in" else "Check-out"} · ${format(pendingEntry.timestamp, "dd MMM, h:mm a")}\nThe admin may already have received this record. Retry to confirm; the same record won’t be counted twice.", 13, muted)
+            label(pendingCard, "Awaiting professor receipt", 17, ink, true)
+            label(pendingCard, "${if (pendingEntry.checkIn) "Check-in" else "Check-out"} · ${format(pendingEntry.timestamp, "dd MMM, h:mm a")}\nThe professor may already have received this record. Retry to confirm; the same record won’t be counted twice.", 13, muted)
         }
         if (!history) {
             val hero = card(color = Color.rgb(225, 238, 225))
             label(hero, if (nextIn) "○  YOU’RE CHECKED OUT" else "●  YOU’RE CHECKED IN", 12, green, true)
-            label(hero, if (busy) "Connecting to\nyour office…" else if (nextIn) "Ready for\na good day?" else "You’re on\nthe clock.", 30, ink, true)
-            label(hero, if (busy) "Keep this screen open while we find the station and wait for its receipt (up to 45 seconds)." else "Scan, send attendance, and receive confirmation from the admin phone.", 15, muted)
+            label(hero, if (busy) "Connecting to\nyour campus…" else if (nextIn) "Ready for\na good day?" else "You’re checked\nin on campus.", 30, ink, true)
+            label(hero, if (busy) "Keep this screen open while we find the station and wait for its receipt (up to 45 seconds)." else "Scan, send attendance, and receive confirmation from the professor phone.", 15, muted)
             button(hero, if (busy) "Cancel transfer" else if (pendingEntry != null) "Retry pending attendance" else if (nextIn) "Scan & check in" else "Scan & check out") {
                 if (busy) { stopBle(); notice = if (store.pendingRecord() != null) "Transfer cancelled. Retry the pending record to confirm delivery." else "Scan cancelled. No attendance was created."; dashboard() }
                 else withBluetooth(false) {
@@ -296,8 +298,8 @@ class MainActivity : AppCompatActivity() {
                         busy = false
                         notice = try {
                             val entry = store.confirmRecord(id)
-                            "${if (entry.checkIn) "Checked in" else "Checked out"} at ${format(entry.timestamp, "h:mm a")}. Received by admin and saved on both phones."
-                        } catch (_: Exception) { "Admin received attendance, but the local receipt couldn’t be saved. Retry the pending record safely." }
+                            "${if (entry.checkIn) "Checked in" else "Checked out"} at ${format(entry.timestamp, "h:mm a")}. Received by professor and saved on both phones."
+                        } catch (_: Exception) { "Professor received attendance, but the local receipt couldn’t be saved. Retry the pending record safely." }
                         dashboard()
                     }, failed = { message -> busy = false; notice = message; dashboard() })
                 }
@@ -310,10 +312,10 @@ class MainActivity : AppCompatActivity() {
         }
         val list = card()
         label(list, if (history) "All records (${records.size})" else "Recent activity", 18, ink, true)
-        if (records.isEmpty()) label(list, "Your first check-in starts here.\nFind the office signal to add a record.", 15, muted)
+        if (records.isEmpty()) label(list, "Your first check-in starts here.\nFind the campus signal to add a record.", 15, muted)
         (if (history) records.asReversed() else records.takeLast(4).asReversed()).forEach { entry ->
             label(list, "${if (entry.checkIn) "↘  Check in" else "↗  Check out"}   ·   ${format(entry.timestamp, "h:mm a")}", 16, ink, true)
-            label(list, "${format(entry.timestamp, "dd MMM yyyy")}  ·  ${entry.office}\n${if (entry.delivered) "Received by admin" else "Local only · recorded before sharing was added"}", 12, muted)
+            label(list, "${format(entry.timestamp, "dd MMM yyyy")}  ·  ${entry.office}\n${if (entry.delivered) "Received by professor" else "Local only · recorded before sharing was added"}", 12, muted)
             space(list, 10)
         }
         button(body, if (history) "Back to check-in" else "View attendance history", true, !busy) { history = !history; notice = ""; dashboard() }
@@ -335,7 +337,7 @@ class MainActivity : AppCompatActivity() {
             val manager = getSystemService(LocationManager::class.java)
             val enabled = if (Build.VERSION.SDK_INT >= 28) manager.isLocationEnabled else manager.isProviderEnabled(LocationManager.GPS_PROVIDER) || manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
             if (!enabled) {
-                notice = "Turn on Location services, then retry the scan. Android uses this for BLE-based office presence."
+                notice = "Turn on Location services, then retry the scan. Android uses this for BLE-based campus presence."
                 dashboard()
                 button(body, "Open Location settings", true) { startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }
                 return

@@ -49,7 +49,7 @@ class AttendanceStationService : Service() {
     }
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == STOP) { finish("Office station stopped. Received records are saved."); return START_NOT_STICKY }
+        if (intent?.action == STOP) { finish("Campus station stopped. Received records are saved."); return START_NOT_STICKY }
         if (shuttingDown) return START_NOT_STICKY
         // Promote immediately, including a system restart, before asynchronous BLE setup.
         try {
@@ -57,7 +57,7 @@ class AttendanceStationService : Service() {
                 startForeground(NOTIFICATION, notification("Starting attendance station…"), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
             } else startForeground(NOTIFICATION, notification("Starting attendance station…"))
             val profile = store.profile()
-            check(profile?.admin == true) { "An admin profile is required to start the station." }
+            check(profile?.admin == true) { "A professor profile is required to start the station." }
             if (Build.VERSION.SDK_INT >= 31) {
                 check(listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE)
                     .all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }) {
@@ -118,7 +118,7 @@ class AttendanceStationService : Service() {
     override fun onDestroy() {
         ble.stop()
         unregisterReceiver(bluetoothState)
-        if (!shuttingDown) publish(State(message = "Office station stopped. Received records are saved."))
+        if (!shuttingDown) publish(State(message = "Campus station stopped. Received records are saved."))
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
