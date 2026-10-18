@@ -70,7 +70,7 @@ class AttendanceStationService : Service() {
                 return START_STICKY
             }
             publish(State(starting = true))
-            ble.broadcast(requireNotNull(profile).office, receive = store::receive, received = {
+            ble.broadcast(requireNotNull(profile).room, receive = store::receive, received = {
                 // No names or attendance details on the lock screen.
                 publish(state.copy(message = "New attendance received and saved."))
             }, started = {

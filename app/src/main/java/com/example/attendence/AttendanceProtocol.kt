@@ -21,9 +21,9 @@ object AttendanceProtocol {
 
     fun validate(entry: Attendance) {
         require(UUID.fromString(entry.id).toString() == entry.id)
-        require(entry.employeeId.isNotBlank() && entry.employeeId.length <= 64)
+        require(entry.studentId.isNotBlank() && entry.studentId.length <= 64)
         require(entry.employeeName.isNotBlank() && entry.employeeName.length <= 64)
-        require(entry.office.matches(Regex("[A-Z0-9-]{4,24}")))
+        require(entry.room.matches(Regex("[A-Z0-9-]{4,24}")))
         require(entry.timestamp > 0 && entry.rssi in -127..20)
     }
 
@@ -34,11 +34,11 @@ object AttendanceProtocol {
         DataOutputStream(bytes).use { output ->
             output.writeInt(1)
             output.writeUTF(entry.id)
-            output.writeUTF(entry.employeeId)
+            output.writeUTF(entry.studentId)
             output.writeUTF(entry.employeeName)
             output.writeLong(entry.timestamp)
             output.writeBoolean(entry.checkIn)
-            output.writeUTF(entry.office)
+            output.writeUTF(entry.room)
             output.writeInt(entry.rssi)
         }
 
@@ -54,21 +54,21 @@ object AttendanceProtocol {
         require(input.readInt() == 1) { "Unsupported protocol version" }
 
         val id = input.readUTF()
-        val employeeId = input.readUTF()
+        val studentId = input.readUTF()
         val name = input.readUTF()
         val time = input.readLong()
         val checkIn = input.readBoolean()
-        val office = input.readUTF()
+        val room = input.readUTF()
         val rssi = input.readInt()
 
         require(input.available() == 0) { "Unexpected trailing data" }
 
         return Attendance(
             id = id,
-            employeeId = employeeId,
+            studentId = studentId,
             timestamp = time,
             checkIn = checkIn,
-            office = office,
+            room = room,
             rssi = rssi,
             employeeName = name
         ).also {

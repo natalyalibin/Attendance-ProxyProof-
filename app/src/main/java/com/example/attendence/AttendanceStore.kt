@@ -10,16 +10,16 @@ import java.util.UUID
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
-data class Profile(val name: String, val employeeId: String, val office: String, val admin: Boolean)
+data class Profile(val name: String, val studentId: String, val room: String, val admin: Boolean)
 data class Attendance(
-    val id: String, val employeeId: String, val timestamp: Long, val checkIn: Boolean,
-    val office: String, val rssi: Int, val employeeName: String = "",
+    val id: String, val studentId: String, val timestamp: Long, val checkIn: Boolean,
+    val room: String, val rssi: Int, val employeeName: String = "",
     val delivered: Boolean = false, val receivedAt: Long = 0L
 )
 
 object AttendanceRules {
     fun nextIsCheckIn(records: List<Attendance>): Boolean = records.lastOrNull()?.checkIn != true
-    fun officeUuid(code: String): UUID = UUID.nameUUIDFromBytes("attendance-office-v1:${code.trim().uppercase(java.util.Locale.ROOT)}".toByteArray(Charsets.UTF_8))
+    fun officeUuid(code: String): UUID = UUID.nameUUIDFromBytes("attendance-room-v1:${code.trim().uppercase(java.util.Locale.ROOT)}".toByteArray(Charsets.UTF_8))
     fun workedMillis(records: List<Attendance>, now: Long): Long {
         var start: Long? = null
         var total = 0L
@@ -37,11 +37,11 @@ class AttendanceStore(context: Context) {
     private val prefs = context.getSharedPreferences("attendance_local", Context.MODE_PRIVATE)
     fun profile(): Profile? = prefs.getString("profile", null)?.let {
         val obj = JSONObject(it)
-        Profile(obj.getString("name"), obj.getString("employeeId"), obj.getString("office"), obj.getBoolean("admin"))
+        Profile(obj.getString("name"), obj.getString("studentId"), obj.getString("room"), obj.getBoolean("admin"))
     }
     fun setup(profile: Profile, pin: String): Boolean {
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
-        val obj = JSONObject().put("name", profile.name).put("employeeId", profile.employeeId).put("office", profile.office).put("admin", profile.admin)
+        val obj = JSONObject().put("name", profile.name).put("studentId", profile.studentId).put("room", profile.room).put("admin", profile.admin)
         return prefs.edit().putString("profile", obj.toString()).putString("salt", encode(salt)).putString("pin", encode(hash(pin, salt))).commit()
     }
     fun verify(pin: String): Boolean {
@@ -50,12 +50,12 @@ class AttendanceStore(context: Context) {
         return MessageDigest.isEqual(hash(pin, Base64.decode(salt, Base64.NO_WRAP)), Base64.decode(expected, Base64.NO_WRAP))
     }
     private fun toJson(entry: Attendance) = JSONObject()
-        .put("id", entry.id).put("employeeId", entry.employeeId).put("timestamp", entry.timestamp)
-        .put("checkIn", entry.checkIn).put("office", entry.office).put("rssi", entry.rssi)
+        .put("id", entry.id).put("studentId", entry.studentId).put("timestamp", entry.timestamp)
+        .put("checkIn", entry.checkIn).put("room", entry.room).put("rssi", entry.rssi)
         .put("employeeName", entry.employeeName).put("delivered", entry.delivered).put("receivedAt", entry.receivedAt)
     private fun fromJson(obj: JSONObject) = Attendance(
-        obj.getString("id"), obj.getString("employeeId"), obj.getLong("timestamp"),
-        obj.getBoolean("checkIn"), obj.getString("office"), obj.getInt("rssi"),
+        obj.getString("id"), obj.getString("studentId"), obj.getLong("timestamp"),
+        obj.getBoolean("checkIn"), obj.getString("room"), obj.getInt("rssi"),
         obj.optString("employeeName", ""), obj.optBoolean("delivered", false), obj.optLong("receivedAt", 0)
     )
     private fun readList(key: String): List<Attendance> {
@@ -74,8 +74,8 @@ class AttendanceStore(context: Context) {
         pendingRecord()?.let { return it }
         val profile = requireNotNull(profile())
         check(!profile.admin)
-        val entry = Attendance(UUID.randomUUID().toString(), profile.employeeId, System.currentTimeMillis(),
-            AttendanceRules.nextIsCheckIn(records()), profile.office, rssi, profile.name)
+        val entry = Attendance(UUID.randomUUID().toString(), profile.studentId, System.currentTimeMillis(),
+            AttendanceRules.nextIsCheckIn(records()), profile.room, rssi, profile.name)
         check(prefs.edit().putString("pending", toJson(entry).toString()).commit())
         return entry
     }
@@ -91,7 +91,7 @@ class AttendanceStore(context: Context) {
     /** A successful return is the admin's durable receipt. Duplicate IDs never create extra rows. */
     @Synchronized fun receive(entry: Attendance): Boolean {
         val profile = requireNotNull(profile())
-        require(profile.admin && entry.office == profile.office)
+        require(profile.admin && entry.room == profile.room)
         AttendanceProtocol.validate(entry)
         val records = teamRecords()
         val existing = records.find { it.id == entry.id }

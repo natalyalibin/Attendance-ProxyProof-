@@ -34,7 +34,7 @@ class BleAttendance(private val context: Context) {
     }
     private fun clearDeadline() { timeout?.let { handler.removeCallbacks(it) }; timeout = null }
 
-    fun submit(office: String, prepare: (Int) -> Attendance, delivered: (String) -> Unit, failed: (String) -> Unit) {
+    fun submit(room: String, prepare: (Int) -> Attendance, delivered: (String) -> Unit, failed: (String) -> Unit) {
         stop()
         Log.d("AttendanceBLE", "Starting BLE operation")
         val run = generation
@@ -45,12 +45,12 @@ class BleAttendance(private val context: Context) {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 handler.post {
                     if (generation != run || scan !== this) return@post
-                    if (result.scanRecord?.serviceUuids?.contains(ParcelUuid(AttendanceRules.officeUuid(office))) != true) return@post
+                    if (result.scanRecord?.serviceUuids?.contains(ParcelUuid(AttendanceRules.officeUuid(room))) != true) return@post
                     stopScan()
                     val entry = try { prepare(result.rssi) } catch (_: Exception) {
                         fail("Couldn’t save the pending attendance. Please try again."); return@post
                     }
-                    connect(result.device, office, entry, run, delivered, ::fail)
+                    connect(result.device, room, entry, run, delivered, ::fail)
                 }
             }
             override fun onScanFailed(errorCode: Int) { handler.post { if (scan === this) fail("Couldn’t scan (code $errorCode). Wait a moment and retry.") } }
@@ -58,12 +58,12 @@ class BleAttendance(private val context: Context) {
         scan = callback
         deadline(15_000) { fail("Campus station not found. Move closer, check the campus code, and ask the professor to start the station.") }
         try {
-            deviceScanner.startScan(listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(AttendanceRules.officeUuid(office))).build()),
+            deviceScanner.startScan(listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(AttendanceRules.officeUuid(room))).build()),
                 ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(), callback)
         } catch (_: Exception) { fail("Couldn’t start scanning. Check Bluetooth and permissions.") }
     }
 
-    private fun connect(device: BluetoothDevice, office: String, entry: Attendance, run: Int,
+    private fun connect(device: BluetoothDevice, room: String, entry: Attendance, run: Int,
                         delivered: (String) -> Unit, fail: (String) -> Unit) {
         val packets = try { AttendanceProtocol.packets(entry) } catch (_: Exception) { fail("Invalid attendance record. Couldn’t send it."); return }
         var packetIndex = 0
@@ -100,7 +100,7 @@ class BleAttendance(private val context: Context) {
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) { Log.d("AttendanceBLE", "Services discovered status=$status"); handler.post {
                 if (generation != run || client !== gatt) return@post
                 if (status != BluetoothGatt.GATT_SUCCESS) { fail("Campus service discovery failed. Please retry."); return@post }
-                writeCharacteristic = gatt.getService(AttendanceRules.officeUuid(office))?.getCharacteristic(AttendanceProtocol.characteristicUuid)
+                writeCharacteristic = gatt.getService(AttendanceRules.officeUuid(room))?.getCharacteristic(AttendanceProtocol.characteristicUuid)
                 writeNext(gatt)
             } }
             override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) { Log.d("AttendanceBLE", "Write receipt packet=$packetIndex status=$status"); handler.post {
@@ -117,7 +117,7 @@ class BleAttendance(private val context: Context) {
         } catch (_: Exception) { fail("Couldn’t connect to the campus station. Check Bluetooth permissions.") }
     }
 
-    fun broadcast(office: String, receive: (Attendance) -> Boolean, received: (Attendance) -> Unit,
+    fun broadcast(room: String, receive: (Attendance) -> Boolean, received: (Attendance) -> Unit,
                   started: () -> Unit, failed: (String) -> Unit) {
         stop()
         Log.d("AttendanceBLE", "Starting BLE operation")
@@ -136,7 +136,7 @@ class BleAttendance(private val context: Context) {
             try {
                 deviceAdvertiser.startAdvertising(AdvertiseSettings.Builder().setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                     .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM).setConnectable(true).build(),
-                    AdvertiseData.Builder().addServiceUuid(ParcelUuid(AttendanceRules.officeUuid(office))).setIncludeDeviceName(false).build(), callback)
+                    AdvertiseData.Builder().addServiceUuid(ParcelUuid(AttendanceRules.officeUuid(room))).setIncludeDeviceName(false).build(), callback)
             } catch (_: Exception) { fail("Couldn’t start the station. Check Bluetooth and permissions.") }
         }
         val callback = object : BluetoothGattServerCallback() {
@@ -164,7 +164,7 @@ class BleAttendance(private val context: Context) {
                         peer.touched = now
                         val entry = peer.buffer.accept(packet)
                         if (entry != null) {
-                            require(entry.office == office)
+                            require(entry.room == room)
                             // Persist before acknowledging COMMIT. A lost response can be retried by ID.
                             if (receive(entry)) newEntry = entry
                             peers.remove(device.address)
@@ -185,7 +185,7 @@ class BleAttendance(private val context: Context) {
         deadline(15_000) { fail("The campus station took too long to start. Please retry.") }
         try {
             server = manager?.openGattServer(context, callback)
-            val service = BluetoothGattService(AttendanceRules.officeUuid(office), BluetoothGattService.SERVICE_TYPE_PRIMARY)
+            val service = BluetoothGattService(AttendanceRules.officeUuid(room), BluetoothGattService.SERVICE_TYPE_PRIMARY)
             service.addCharacteristic(BluetoothGattCharacteristic(AttendanceProtocol.characteristicUuid, BluetoothGattCharacteristic.PROPERTY_WRITE, BluetoothGattCharacteristic.PERMISSION_WRITE))
             if (server?.addService(service) != true) fail("This phone couldn’t open the attendance service. Try another phone.")
         } catch (_: Exception) { fail("Couldn’t open the campus station. Check Bluetooth and permissions.") }
